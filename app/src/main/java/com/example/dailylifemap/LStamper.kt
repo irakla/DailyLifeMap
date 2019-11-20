@@ -3,8 +3,8 @@ package com.example.dailylifemap
 import android.content.Context
 import android.location.Location
 import android.os.Looper
+import android.util.Log
 import com.google.android.gms.location.*
-import org.jetbrains.anko.toast
 
 class LStamper(private val appContext : Context) {
 
@@ -12,23 +12,26 @@ class LStamper(private val appContext : Context) {
     private lateinit var settingLocationRequest: LocationRequest
     private var nowActiveCallback: OnlyForOneLocation? = null
 
-    class OnlyForOneLocation(
-        private val appContext: Context,
-        private val locationProvider: FusedLocationProviderClient
+    private inner class OnlyForOneLocation(
+        private val appContext: Context
+        , private val locationProvider: FusedLocationProviderClient
+        , private val callbackWithNewLocation: ((Location?) -> Unit)? = null
         ) : LocationCallback() {
-        private var positionLast: Location? = null
 
         override fun onLocationResult(locationResult: LocationResult?) {
             super.onLocationResult(locationResult)
 
-            positionLast = locationResult?.lastLocation
-
-            val positionCurrent = positionLast
-            if(positionCurrent != null) {
-                appContext.toast("${"%.6f".format(positionCurrent.latitude)}, ${"%.6f".format(positionCurrent.longitude)}")
+            val positionCurrent = locationResult?.lastLocation
+            positionCurrent?.let{
+                Log.d("New Location"
+                    , "${"%.6f".format(it.latitude)}, ${"%.6f".format(it.longitude)}")
             }
 
             locationProvider.removeLocationUpdates(this)
+            if(nowActiveCallback == this)   //this is the latest callback
+                nowActiveCallback = null
+
+            callbackWithNewLocation?.invoke(positionCurrent)
         }
     }
 
@@ -47,8 +50,8 @@ class LStamper(private val appContext : Context) {
         }
     }
 
-     fun getNowLocation(){
-        nowActiveCallback = OnlyForOneLocation(appContext, locationProvider)
+    fun updateTheLatestLocation(doingWithNewLocation: ((Location?) -> Unit)? = null){
+        nowActiveCallback = OnlyForOneLocation(appContext, locationProvider, doingWithNewLocation)
         locationProvider.requestLocationUpdates(settingLocationRequest, nowActiveCallback, Looper.myLooper())
     }
 }
