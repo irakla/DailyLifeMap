@@ -1,0 +1,41 @@
+package com.example.dailylifemap
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
+import android.content.DialogInterface
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+
+object PermissionManager{
+
+    fun isExist_deniedPermission(context: Context, permissions: Array<out String>) : Boolean
+            = deniedPermListOf(context, permissions).isNotEmpty()
+
+    fun deniedPermListOf(context: Context, permissions: Array<out String>): Array<String>
+            = permissions.filter {
+        PackageManager.PERMISSION_GRANTED !=
+                ContextCompat.checkSelfPermission(context, it)
+    }.toTypedArray()
+
+    fun showRequest(activity: Activity, permissions: Array<out String>, permissionCode: Int
+                    , forFeature: String, permNameForUser: String)
+    {
+        val builder: AlertDialog.Builder = AlertDialog.Builder(activity)
+
+        builder.setMessage(forFeature + "기능을 위해 " + permNameForUser + "권한이 필요합니다.")
+        builder.setPositiveButton("예"
+        ) { dialog, id -> ActivityCompat.requestPermissions(activity, permissions, permissionCode) }
+
+        builder.setNegativeButton("아니오(종료)"
+        ) { dialog, which ->
+            activity.finishActivity(0)
+            activity.finish()
+            System.runFinalization()
+            android.os.Process.killProcess(android.os.Process.myPid() )
+        }
+
+        builder.show()
+    }
+}

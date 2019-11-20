@@ -1,42 +1,51 @@
 package com.example.dailylifemap
 
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
+import android.Manifest
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Base64
-import android.util.Log
+import android.os.Looper
+import com.example.dailylifemap.PermissionManager.isExist_deniedPermission
+import com.example.dailylifemap.PermissionManager.showRequest
+import com.google.android.gms.location.*
+import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
 import kotlinx.android.synthetic.main.activity_main.*
-import java.security.MessageDigest
-import java.security.NoSuchAlgorithmException
+import org.jetbrains.anko.toast
+
+val permissionCodeForLocation = 1000
+val permissionsForLocation = arrayOf(
+    Manifest.permission.ACCESS_COARSE_LOCATION
+    , Manifest.permission.ACCESS_FINE_LOCATION
+    //, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+)
 
 class MainActivity : AppCompatActivity() {
 
     private var mapInstance: NaverMap? = null
+    private lateinit var locationStamper: LStamper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val mapFragment = mapView as MapFragment?
-            ?: MapFragment.newInstance().also{
-                supportFragmentManager.beginTransaction().add(R.id.mapView, it).commit()
-            }
+        if(isExist_deniedPermission(this, permissionsForLocation))
+            showRequest(this, permissionsForLocation, permissionCodeForLocation,
+                "위치관련", "위치조회, 앱 오프라인 위치조회")
 
-        try{
-            val info = packageManager.getPackageInfo("com.example.dailylifemap", PackageManager.GET_SIGNATURES)
-            for(signature in info.signatures){
-                val md = MessageDigest.getInstance("SHA")
-                md.update(signature.toByteArray())
-                Log.e("KeyHash : ", Base64.encodeToString(md.digest(), Base64.DEFAULT))
+        val mapFragment = fragmentMap as MapFragment?
+            ?: MapFragment.newInstance().also{
+                supportFragmentManager.beginTransaction().add(fragmentMap.id, it).commit()
             }
-        }catch(e: PackageManager.NameNotFoundException){ e.printStackTrace() }
-        catch(e: NoSuchAlgorithmException){ e.printStackTrace() }
 
         mapFragment.getMapAsync {
             mapInstance = it
+        }
+
+        locationStamper = LStamper(this)
+
+        buttonPrintLocation.setOnClickListener {
+            locationStamper.getNowLocation()
         }
     }
 }
