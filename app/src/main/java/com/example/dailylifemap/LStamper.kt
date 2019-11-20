@@ -7,9 +7,9 @@ import com.google.android.gms.location.*
 import org.jetbrains.anko.toast
 
 class LStamper(private val appContext : Context) {
+
     private lateinit var locationProvider: FusedLocationProviderClient
     private lateinit var settingLocationRequest: LocationRequest
-    private val nowCallbackForLStamp = null
     private var nowActiveCallback: OnlyForOneLocation? = null
 
     class OnlyForOneLocation(
@@ -24,11 +24,12 @@ class LStamper(private val appContext : Context) {
             positionLast = locationResult?.lastLocation
 
             val positionCurrent = positionLast
-            if(positionCurrent != null)
-                appContext.toast("${positionCurrent.latitude}, ${positionCurrent.longitude}")
+            if(positionCurrent != null) {
+                appContext.toast("${"%.6f".format(positionCurrent.latitude)}, ${"%.6f".format(positionCurrent.longitude)}")
+            }
 
             locationProvider.removeLocationUpdates(this)
-            }
+        }
     }
 
     init{
@@ -40,13 +41,14 @@ class LStamper(private val appContext : Context) {
 
         settingLocationRequest = LocationRequest().apply{
             priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-            maxWaitTime = 7000                                  //milliseconds
+            interval = 10000
+            fastestInterval = 3000
+            maxWaitTime = 30000                                  //milliseconds
         }
-
-        nowActiveCallback = OnlyForOneLocation(appContext, locationProvider)
     }
 
      fun getNowLocation(){
+        nowActiveCallback = OnlyForOneLocation(appContext, locationProvider)
         locationProvider.requestLocationUpdates(settingLocationRequest, nowActiveCallback, Looper.myLooper())
     }
 }
