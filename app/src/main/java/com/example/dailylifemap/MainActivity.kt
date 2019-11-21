@@ -6,12 +6,10 @@ import android.os.Bundle
 import com.example.dailylifemap.PermissionManager.isExist_deniedPermission
 import com.example.dailylifemap.PermissionManager.showRequest
 import com.naver.maps.geometry.LatLng
-import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
 import kotlinx.android.synthetic.main.activity_main.*
-import org.jetbrains.anko.toast
 
 val permissionCodeForLocation = 1000
 val permissionsForLocation = arrayOf(
@@ -24,6 +22,9 @@ class MainActivity : AppCompatActivity() {
 
     private var mapInstance: NaverMap? = null
     private lateinit var locationStamper: LStamper
+
+    //For Test
+    private lateinit var locationTimelineViewModel: LTimelineViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,10 +45,19 @@ class MainActivity : AppCompatActivity() {
 
         locationStamper = LStamper(this)
 
-        buttonPrintLocation.setOnClickListener {
+        locationTimelineViewModel = LTimelineViewModel(this.application)
+
+        buttonGetLocation.setOnClickListener {
             locationStamper.updateTheLatestLocation {
-                it?.let{ mapInstance?.moveCamera(CameraUpdate.scrollTo((LatLng(it.latitude, it.longitude))))}
+                it?.let{
+                    mapInstance?.moveCamera(CameraUpdate.scrollTo((LatLng(it.latitude, it.longitude))))
+                    locationTimelineViewModel.insertLocation(it)
+                }
             }
+        }
+
+        buttonPrintLocation.setOnClickListener {
+            locationTimelineViewModel.selectLocation()
         }
     }
 }
