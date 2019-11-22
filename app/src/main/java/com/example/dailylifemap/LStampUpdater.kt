@@ -18,7 +18,7 @@ class LStampUpdater() : Service() {
                     val serviceIntent = Intent(context, LStampUpdater::class.java)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                        context.startForegroundService(serviceIntent)
+                    context.startForegroundService(serviceIntent)
                     else
                         context.startService(serviceIntent)
                 }
@@ -34,7 +34,7 @@ class LStampUpdater() : Service() {
         : Worker(appContext, workerParams) {
 
         override fun doWork(): Result {
-            locationStamper.updateTheLatestLocation{
+            locationStamper.requestNowLocation(PermissionManager.IS_NOT_ACTIVITY){
                 it?.let{
                     //TODO : 주기적으로 위치를 받는다면 수행하는 작업
                 }
