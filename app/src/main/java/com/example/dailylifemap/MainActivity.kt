@@ -3,6 +3,7 @@ package com.example.dailylifemap
 import android.Manifest
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import com.example.dailylifemap.PermissionManager.existDeniedpermission
 import com.example.dailylifemap.PermissionManager.showOnlyRequestAnd
 import com.naver.maps.geometry.LatLng
@@ -30,7 +31,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     //For Test
-    private lateinit var locationTimelineViewModel: LTimelineViewModel
+    private lateinit var timelineRepository: LTimelineRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,19 +58,24 @@ class MainActivity : AppCompatActivity() {
 
         locationStamper = LStamper(this)
 
-        locationTimelineViewModel = LTimelineViewModel(this.application)
+         timelineRepository = LTimelineRepository(this.application)
 
         buttonGetLocation.setOnClickListener {
             locationStamper.requestNowLocation(MOVE_TO_NOW_LOCATION){
                 it?.let{
                     mapInstance?.moveCamera(CameraUpdate.scrollTo((LatLng(it.latitude, it.longitude))))
-                    //locationTimelineViewModel.insertLocation(it)
+                    timelineRepository.locationInsert(it)
                 }
             }
         }
 
         buttonPrintLocation.setOnClickListener {
-            //locationTimelineViewModel.selectLocation()
+            //TODO : is still exploding
+            timelineRepository.locationSelect {timeline ->
+                timeline.forEach {
+                    Log.d("print", it.toString())
+                }
+            }
         }
     }
 

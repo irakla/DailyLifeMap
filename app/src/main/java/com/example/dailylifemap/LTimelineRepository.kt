@@ -24,6 +24,40 @@ data class LEntity(
     , @ColumnInfo(name = LTimelineDB.L_VERTICALACCURACY) val verticalAccuracyMeters: Float
 )
 
+fun toLEntityFromLocation(location: Location) : LEntity{
+    return LEntity(
+        timeMillis = location.time
+        , accuracy = location.accuracy
+        , altitude = location.altitude
+        , bearing = location.bearing
+        , bearingAccuracyDegrees = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) location.bearingAccuracyDegrees
+        else 0.0f
+        , latitude = location.latitude
+        , longitude = location.longitude
+        , provider = location.provider
+        , speed = location.speed
+        , verticalAccuracyMeters =
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) location.verticalAccuracyMeters
+        else 0.0f
+    )
+}
+
+fun toLocationFromLEntity(entity: LEntity) : Location{
+    return Location(entity.provider).apply{
+        time = entity.timeMillis
+        accuracy = entity.accuracy
+        altitude = entity.altitude
+        bearing = entity.bearing
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            bearingAccuracyDegrees = entity.bearingAccuracyDegrees
+        latitude = entity.latitude
+        longitude = entity.longitude
+        speed = entity.speed
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            verticalAccuracyMeters = entity.verticalAccuracyMeters
+    }
+}
+
 @Dao
 interface LDao{
     /*
@@ -108,53 +142,36 @@ class LTimelineRepository(val appContext: Context) {
                 return null
             }
         }
-    }
 
-    fun locationInsert(location: Location){
-        val entity = LEntity(
-            accuracy = location.accuracy
-            , altitude = location.altitude
-            , bearing = location.bearing
-            , bearingAccuracyDegrees =
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) location.bearingAccuracyDegrees
-            else 0.0f
-            , latitude = location.latitude
-            , longitude = location.longitude
-            , provider = location.provider
-            , speed = location.speed
-            , timeMillis = location.time
-            , verticalAccuracyMeters =
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) location.verticalAccuracyMeters
-            else 0.0f
-            )
+        private class SelectAsyncTask(
+            private val locationDao: LDao
+            , private val doingWithTimeline: (List<LEntity>) -> Unit)
+            : AsyncTask<Void, Void, List<LEntity>>()
+        {
+            override fun doInBackground(vararg p0: Void): List<LEntity>? {
+                val timeline = locationDao.loadAll()
 
-        if(isUsable)
-            locationDao.insertLocation(entity)
-    }
+                return timeline
+            }
 
-    fun locationSelect(){
-        if(isUsable) {
-            val locations = locationDao.loadAll()
-
-            locations.forEachIndexed { index, location ->
-                Log.d("Loaded Location$index", "${location.latitude}, ${location.longitude}")
+            override fun onPostExecute(result: List<LEntity>?) {
+                result?.let{ doingWithTimeline(it) }
             }
         }
     }
-}
 
-class LTimelineViewModel(application: Application) : AndroidViewModel(application) {
-    private lateinit var timelineRepository: LTimelineRepository
+    fun locationInsert(location: Location){
+        val entity = toLEntityFromLocation(location)
 
-    init{
-        timelineRepository = LTimelineRepository(application)
+        if(isUsable)
+            InsertAsyncTask(locationDao).execute(entity)
     }
 
-    fun insertLocation(location: Location){
-        timelineRepository.locationInsert(location)
-    }
-
-    fun selectLocation(){
-        timelineRepository.locationSelect()
+    fun locationSelect(doingWithTimeline: (List<Location>) -> Unit){
+        if(isUsable){
+            SelectAsyncTask(locationDao){ lEntities ->
+                doingWithTimeline(lEntities.map{ toLocationFromLEntity(it) })
+            }.execute()
+        }
     }
 }
