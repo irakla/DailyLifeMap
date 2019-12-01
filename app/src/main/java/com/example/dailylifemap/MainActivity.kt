@@ -4,12 +4,14 @@ import android.Manifest
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import androidx.annotation.UiThread
 import com.example.dailylifemap.PermissionManager.existDeniedpermission
 import com.example.dailylifemap.PermissionManager.showOnlyRequestAnd
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
+import com.naver.maps.map.overlay.PathOverlay
 import kotlinx.android.synthetic.main.activity_main.*
 import org.jetbrains.anko.toast
 
@@ -21,13 +23,18 @@ val permissionsForLocation = arrayOf(
 
 class MainActivity : AppCompatActivity() {
 
-    private var mapInstance: NaverMap? = null
-    private lateinit var locationStamper: LStamper
-
     companion object{
         //for permission check
         private const val STARTING = 10000
-        private const val MOVE_TO_NOW_LOCATION = 10001
+        const val IN_NEW_LOCATION = 10001
+    }
+
+    private var mapInstance: NaverMap? = null
+    private lateinit var locationStamper: LStamper
+    private var myPathOverlay: PathOverlay = PathOverlay()
+
+    init{
+
     }
 
     //For Test
@@ -37,6 +44,36 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        startupCheck()
+        mountMap()
+        TimelineConstructor.isRunningTimelineConstruction(this)
+
+        locationStamper = LStamper(this)
+
+         timelineRepository = LTimelineRepository(this.application)
+
+        buttonGetLocation.setOnClickListener {
+            /*locationStamper.requestNowLocation(IN_NEW_LOCATION){
+                it?.let{
+                    mapInstance?.moveCamera(CameraUpdate.scrollTo((LatLng(it.latitude, it.longitude))))
+                    timelineRepository.locationInsert(it)
+                }
+            }*/
+
+            TimelineConstructor.isRunningTimelineConstruction(this)
+        }
+
+        buttonPrintLocation.setOnClickListener {
+            //TODO : is still exploding
+            timelineRepository.locationSelect {timeline ->
+                timeline.forEach {
+                    Log.d("print", "${it.time} : ${it.toString()}")
+                }
+            }
+        }
+    }
+
+    private fun startupCheck(){
         if(existDeniedpermission(this, permissionsForLocation))
             showOnlyRequestAnd(this, permissionsForLocation, STARTING,
                 "어플리케이션의 기능을 정상적으로 사용하기 위해 " +
@@ -47,34 +84,32 @@ class MainActivity : AppCompatActivity() {
                     toast("기능 대부분이 작동하지 않습니다.")
                 }
             }
+
+        TimelineConstructor.checkTimelineConstructionWorker(this)
+    }
+
+    private fun mountMap(){
         val mapFragment = fragmentMap as MapFragment?
             ?: MapFragment.newInstance().also{
                 supportFragmentManager.beginTransaction().add(fragmentMap.id, it).commit()
             }
 
-        mapFragment.getMapAsync {
-            mapInstance = it
-        }
+        mapFragment.getMapAsync { mountedMap ->
+            mapInstance = mountedMap
 
-        locationStamper = LStamper(this)
-
-         timelineRepository = LTimelineRepository(this.application)
-
-        buttonGetLocation.setOnClickListener {
-            locationStamper.requestNowLocation(MOVE_TO_NOW_LOCATION){
-                it?.let{
-                    mapInstance?.moveCamera(CameraUpdate.scrollTo((LatLng(it.latitude, it.longitude))))
-                    timelineRepository.locationInsert(it)
+            timelineRepository.locationSelect {locationList ->
+                if(locationList.size >= 2) {
+                        myPathOverlay.coords =
+                            locationList.map { LatLng(it.latitude, it.longitude) }
+                    runOnUiThread {
+                        myPathOverlay.map = mountedMap
+                        mapInstance?.moveCamera(CameraUpdate.scrollTo(myPathOverlay.coords.last()))
+                    }
                 }
             }
-        }
 
-        buttonPrintLocation.setOnClickListener {
-            //TODO : is still exploding
-            timelineRepository.locationSelect {timeline ->
-                timeline.forEach {
-                    Log.d("print", it.toString())
-                }
+            if(myPathOverlay.coords.size >= 2) {
+
             }
         }
     }
@@ -93,7 +128,7 @@ class MainActivity : AppCompatActivity() {
                         toast("기능 대부분이 작동하지 않습니다.")
                     }
             }
-            /*MOVE_TO_NOW_LOCATION -> {
+            /*IN_NEW_LOCATION -> {
                 if(!PermissionManager.existDeniedpermission(this, permissions))
                     setMapToNowLocation()
                 else

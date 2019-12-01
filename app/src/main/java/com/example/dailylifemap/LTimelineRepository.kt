@@ -1,12 +1,10 @@
 package com.example.dailylifemap
 
-import android.app.Application
 import android.content.Context
 import android.location.Location
 import android.os.AsyncTask
 import android.os.Build
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
 import androidx.room.*
 import org.jetbrains.anko.toast
 
@@ -66,9 +64,14 @@ interface LDao{
     @Query("SELECT * FROM ${LTimelineDB.L_ENTITYTABLE}")
     fun loadAll(): List<LEntity>
     
-    /*@Query("SELECT * FROM ${LTimelineDB.L_ENTITYTABLE}" +
+    @Query("SELECT * FROM ${LTimelineDB.L_ENTITYTABLE}" +
             "WHERE ${LTimelineDB.L_TIME} BETWEEN :timeMillisFrom AND :timeMillisTo")
-    fun loadAllThePeriod(timeMillisFrom: Long, timeMillisTo: Long): List<LEntity>*/
+    fun loadAllThePeriod(timeMillisFrom: Long, timeMillisTo: Long): List<LEntity>
+
+    @Query("SELECT * FROM ${LTimelineDB.L_ENTITYTABLE}" +
+            " WHERE ${LTimelineDB.L_TIME} =" +
+            " (SELECT MAX(${LTimelineDB.L_TIME}) FROM ${LTimelineDB.L_ENTITYTABLE}) LIMIT 1")
+    fun loadLatest(): LEntity
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertLocation(location: LEntity)
@@ -117,7 +120,7 @@ abstract class LTimelineDB : RoomDatabase() {
     }
 }
 
-class LTimelineRepository(val appContext: Context) {
+class LTimelineRepository(private val appContext: Context) {
 
     private var locationDao: LDao
     private var isUsable = true
@@ -131,6 +134,12 @@ class LTimelineRepository(val appContext: Context) {
             Log.d("LTimelineRepository", "Database is null!")
             isUsable = false
         }
+
+        if(isUsable){
+            SelectLatestAsyncTask(locationDao){
+                timeLatestLocation = it.timeMillis
+            }.execute()
+        }
     }
 
     companion object{
@@ -143,33 +152,48 @@ class LTimelineRepository(val appContext: Context) {
             }
         }
 
-        private class SelectAsyncTask(
+        private class SelectAllAsyncTask(
             private val locationDao: LDao
             , private val doingWithTimeline: (List<LEntity>) -> Unit)
-            : AsyncTask<Void, Void, List<LEntity>>()
+            : AsyncTask<Void, Void, List<LEntity>?>()
         {
             override fun doInBackground(vararg p0: Void): List<LEntity>? {
                 val timeline = locationDao.loadAll()
-
+                timeline?.let{ doingWithTimeline(it) }
                 return timeline
             }
+        }
 
-            override fun onPostExecute(result: List<LEntity>?) {
-                result?.let{ doingWithTimeline(it) }
+        private class SelectLatestAsyncTask(
+            private val locationDao: LDao
+            , private val doingWithTimeline: (LEntity) -> Unit)
+            : AsyncTask<Void, Void, LEntity?>()
+        {
+            override fun doInBackground(vararg p0: Void): LEntity? {
+                val latestLocation = locationDao.loadLatest()
+                if(latestLocation != null)
+                    doingWithTimeline(latestLocation)
+                return latestLocation
             }
         }
+
+        private var timeLatestLocation: Long = 0
     }
 
     fun locationInsert(location: Location){
         val entity = toLEntityFromLocation(location)
 
-        if(isUsable)
+        if(isUsable && location.time > timeLatestLocation) {
             InsertAsyncTask(locationDao).execute(entity)
+            timeLatestLocation = location.time
+        }
+        else if(isUsable)
+            Log.d("Invalid Insertion", "tried to duplicate Ltime insertion")
     }
 
     fun locationSelect(doingWithTimeline: (List<Location>) -> Unit){
         if(isUsable){
-            SelectAsyncTask(locationDao){ lEntities ->
+            SelectAllAsyncTask(locationDao){ lEntities ->
                 doingWithTimeline(lEntities.map{ toLocationFromLEntity(it) })
             }.execute()
         }

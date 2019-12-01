@@ -28,9 +28,13 @@
             </intent-filter>
         </activity>
         <service
-            android:name="LStampUpdater"
+            android:name="TimelineConstructor"
             android:foregroundServiceType="location" >
-
         </service>
+        <receiver android:name=".LStamper$LocationUpdaterByBroadcastReceiving">
+            <intent-filter>
+                <action android:name="@string/action_location" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

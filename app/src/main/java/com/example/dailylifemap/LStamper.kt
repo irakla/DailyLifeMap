@@ -1,8 +1,8 @@
 package com.example.dailylifemap
 
 import android.Manifest
-import android.app.Activity
-import android.app.AlertDialog
+import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.location.Location
@@ -11,6 +11,8 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import com.google.android.gms.location.*
+import com.google.android.gms.location.LocationResult.extractResult
+import com.google.android.gms.location.LocationResult.hasResult
 import org.jetbrains.anko.toast
 
 class LStamper(private val appContext : Context) {
@@ -64,10 +66,10 @@ class LStamper(private val appContext : Context) {
     }
 
     fun requestNowLocation(
-        functionCode: Int
+        functionCode: Int = PermissionManager.IS_NOT_ACTIVITY
         , doingWithNewLocation: ((Location?) -> Unit)? = null
     ){
-        val nowActivity: Activity = appContext as Activity
+        val nowActivity = appContext as? Activity
         if(nowActivity != null)             //If invoker is in activity
             nowActivity.let {
                 if(!isOnDeviceLocationSetting()) {
@@ -96,13 +98,83 @@ class LStamper(private val appContext : Context) {
                 updateTheLatestLocation(doingWithNewLocation)
     }
 
-    private fun updateTheLatestLocation(doingWithNewLocation: ((Location?) -> Unit)? = null){
-        val nowActivity: Activity = appContext as Activity
-        nowActivity?.let{ it.toast("현재 위치 조회중...") }
+    private fun updateTheLatestLocation(
+        doingWithNewLocation: ((Location?) -> Unit)? = null){
 
         if(nowActiveCallback == null)
             nowActiveCallback = OnlyForOneLocation(locationProvider, doingWithNewLocation)
-        locationProvider.requestLocationUpdates(settingLocationRequest, nowActiveCallback, Looper.myLooper())
+
+        if(appContext is Activity) {          //Caller is in foreground
+            appContext.toast("현재 위치 조회중...")
+
+            locationProvider.requestLocationUpdates(
+                settingLocationRequest,
+                nowActiveCallback,
+                Looper.myLooper()
+            )
+        }
+        else if(doingWithNewLocation != null){  //Caller isn't in foreground
+            val intent = Intent(appContext, LocationUpdaterByBroadcastReceiving::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                appContext, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+
+            LocationUpdaterByBroadcastReceiving.reserveLocationWork(
+                doingWithNewLocation, locationProvider, pendingIntent)
+            locationProvider.requestLocationUpdates(settingLocationRequest, pendingIntent)
+        }
+    }
+
+    class LocationUpdaterByBroadcastReceiving : BroadcastReceiver(){
+        companion object {
+            private val locationWorkList
+                    = mutableListOf<((Location?) -> Unit)>()
+            private val locationRequestSet
+                    = mutableSetOf<Pair<FusedLocationProviderClient, PendingIntent>>()
+
+            fun reserveLocationWork(
+                locationWork: (Location?) -> Unit
+                , locationProvider: FusedLocationProviderClient
+                , pendingIntent: PendingIntent){
+                synchronized(this){
+                    locationWorkList.add(locationWork)
+                    locationRequestSet.add(Pair(locationProvider, pendingIntent))
+                }
+            }
+        }
+
+        override fun onReceive(context: Context?, intentWithLocation: Intent?) {
+            Log.d("Location custom BR", "is Work.")
+
+            if(intentWithLocation == null)
+                return
+
+            if(intentWithLocation.action.equals(context?.getString(R.string.action_location)))
+                return
+
+            Log.d("Location custom BR", "is Received.")
+
+            var nowLocation: Location? = null
+
+            if(hasResult(intentWithLocation)) {
+                val locationResult = extractResult(intentWithLocation)
+
+                nowLocation = locationResult.lastLocation
+
+                if(nowLocation.accuracy <= 25.0)
+                    synchronized(this) {
+                        val nowReservedWorks = locationWorkList
+                        val nowRequestSet = locationRequestSet
+
+                        nowRequestSet.forEach {
+                            it.first.removeLocationUpdates(it.second)
+                        }
+
+                        nowReservedWorks.forEach { it(nowLocation) }
+
+                        locationWorkList.removeAll(nowReservedWorks)
+                    }
+            }
+        }
     }
 
     private fun isOnDeviceLocationSetting() : Boolean{
