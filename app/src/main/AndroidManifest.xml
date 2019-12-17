@@ -20,7 +20,7 @@
         <meta-data
             android:name="com.kakao.sdk.AppKey"
             android:value="lYPH0d2i7bVC7F8oPI2Paoh5dvI=" />
-        <activity android:name=".MainActivity">
+        <activity android:name=".MapActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

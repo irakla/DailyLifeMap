@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    android:orientation="vertical"
+    tools:context=".MapActivity">
 
     <fragment
         android:id="@+id/fragmentMap"
@@ -17,17 +18,28 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/buttonGetLocation"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="GET"
+        android:id="@+id/buttonShowPlaces"
+        android:layout_width="40dp"
+        android:layout_height="30dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:background="@color/colorHalfTransparentBlack"
+        android:foreground="@drawable/ic_play_arrow_black_24dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/buttonPrintLocation"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/viewWeekDayList"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Print"
-        app:layout_constraintTop_toBottomOf="@+id/buttonGetLocation" />
+        android:layout_height="match_parent"
+        android:layout_marginBottom="60dp"
+        android:scrollbars="vertical"
+        android:visibility="visible"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:listitem="@layout/item_weekday" />
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,12 +1,11 @@
 package com.example.dailylifemap
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
 import android.database.sqlite.SQLiteConstraintException
+import android.os.SystemClock.sleep
+import android.text.format.DateUtils
 import android.util.Log
 import androidx.work.*
-import org.jetbrains.anko.toast
 import java.lang.Exception
 import java.util.concurrent.TimeUnit
 
@@ -16,25 +15,22 @@ class TimelineConstructor(appContext: Context, workerParams: WorkerParameters)
 
     companion object {
         private const val TIMELINE_WORK_TAG = "TimelineWork"
+        private const val KEY_DELAY = "KeyDelay"
+        private const val INTERVAL_DELAY = 7 * DateUtils.MINUTE_IN_MILLIS
 
         fun checkTimelineConstructionWorker(appContext: Context){
             if(!isRunningTimelineConstruction(appContext))
             {
-                val timelineWork = PeriodicWorkRequestBuilder<TimelineConstructor>(
+                val timelineWorkNoDelay = PeriodicWorkRequestBuilder<TimelineConstructor>(
                     15, TimeUnit.MINUTES
                     , 5, TimeUnit.MINUTES
+                ).setInputData(workDataOf(
+                    KEY_DELAY to INTERVAL_DELAY
+                )).build()
+
+                WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
+                    TIMELINE_WORK_TAG, ExistingPeriodicWorkPolicy.KEEP, timelineWorkNoDelay
                 )
-                    .build()
-
-                WorkManager.getInstance(appContext)
-                    .enqueueUniquePeriodicWork(
-                        TIMELINE_WORK_TAG
-                        , ExistingPeriodicWorkPolicy.KEEP
-                        , timelineWork
-                    )
-
-                WorkManager.getInstance(appContext)
-                    .enqueue(timelineWork)
             }
             else
             {
@@ -75,10 +71,27 @@ class TimelineConstructor(appContext: Context, workerParams: WorkerParameters)
     }
 
     private val locationStamper = LStamper(appContext)
-    private val timelineRepository = LTimelineRepository(appContext)
+    private val timelineRepository = LTimelineRepoEntry(appContext)
 
     override fun doWork(): Result {
         return try{
+            val delay = inputData.getLong(KEY_DELAY, 0)
+
+            locationStamper.requestNowLocation(PermissionManager.IS_NOT_ACTIVITY){
+                    Log.d("Location WorkManager", "location is arrived : ${it.toString()}")
+                    it?.let{
+                        try {
+                            timelineRepository.locationInsert(it)
+                        }catch(e: SQLiteConstraintException){
+                            Log.d("Location Insert", "This is Not a New Location.")
+                        }
+
+                        Log.d("Worker's Location work","Work is done.")
+                    }
+            }
+
+            sleep(delay)
+
             locationStamper.requestNowLocation(PermissionManager.IS_NOT_ACTIVITY){
                 Log.d("Location WorkManager", "location is arrived : ${it.toString()}")
                 it?.let{

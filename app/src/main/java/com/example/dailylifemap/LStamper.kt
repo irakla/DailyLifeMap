@@ -13,6 +13,8 @@ import android.util.Log
 import com.google.android.gms.location.*
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationResult.hasResult
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.jetbrains.anko.toast
 
 class LStamper(private val appContext : Context) {
@@ -77,7 +79,7 @@ class LStamper(private val appContext : Context) {
                     return
                 }
 
-                if (PermissionManager.existDeniedpermission(it, permissionForLocation)) {
+                if (PermissionManager.existDeniedPermission(it, permissionForLocation)) {
                     PermissionManager.showOnlyRequestAnd(
                         it, permissionForLocation, functionCode
                         , "현재 위치를 파악하려면 위치 조회 권한이 필요합니다."
@@ -93,7 +95,7 @@ class LStamper(private val appContext : Context) {
             }
 
         else                                //If invoker is not in activity
-            if (!PermissionManager.existDeniedpermission(appContext, permissionForLocation)
+            if (!PermissionManager.existDeniedPermission(appContext, permissionForLocation)
                 && isOnDeviceLocationSetting())
                 updateTheLatestLocation(doingWithNewLocation)
     }
@@ -160,13 +162,13 @@ class LStamper(private val appContext : Context) {
 
                 nowLocation = locationResult.lastLocation
 
-                if(nowLocation.accuracy <= 25.0)
-                    synchronized(this) {
+                if(nowLocation.accuracy <= 15.0)
+                    GlobalScope.launch{
                         val nowReservedWorks = locationWorkList
                         val nowRequestSet = locationRequestSet
 
-                        nowRequestSet.forEach {
-                            it.first.removeLocationUpdates(it.second)
+                        nowRequestSet.forEach { requestSet ->
+                            requestSet.first.removeLocationUpdates(requestSet.second)
                         }
 
                         nowReservedWorks.forEach { it(nowLocation) }

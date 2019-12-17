@@ -14,7 +14,7 @@ object PermissionManager{
 
     const val IS_NOT_ACTIVITY = 0
 
-    fun existDeniedpermission(context: Context, permissions: Array<out String>) : Boolean
+    fun existDeniedPermission(context: Context, permissions: Array<out String>) : Boolean
             = deniedPermListOf(context, permissions).isNotEmpty()
 
     fun deniedPermListOf(context: Context, permissions: Array<out String>): Array<String>

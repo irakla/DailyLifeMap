@@ -43,30 +43,6 @@ class TimelineConstructorTest {
         //setMockLocation(37.3026, 127.9311, 50.0)
     }
 
-    private fun setMockLocation(latitude: Double, longitude: Double, altitude: Double){
-
-        try{
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-            lm.setTestProviderEnabled(GPS_PROVIDER, true)
-            lm.addTestProvider(GPS_PROVIDER
-                ,true, true, true, true, true, true, true,  Criteria.NO_REQUIREMENT, Criteria.ACCURACY_FINE)
-
-            var mockLocation = Location(GPS_PROVIDER).apply{
-                time = System.currentTimeMillis()
-                this.latitude = latitude
-                this.longitude = longitude
-                this.altitude = altitude
-                accuracy = 1.0f
-                elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
-            }
-
-            lm.setTestProviderLocation(GPS_PROVIDER, mockLocation)
-        }catch(e: RuntimeException){
-            Log.d("Mock Location", "Runtime Exception", e)
-        }
-    }
-
     @Test
     fun testTimelineConstructor(){
         val worker = TestWorkerBuilder<TimelineConstructor>(
